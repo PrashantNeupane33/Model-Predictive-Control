@@ -171,7 +171,7 @@ void MPC::computeControlInputs()
     MatrixXd trackingError;
     trackingError=desiredControlTrajectory-O*states.col(k);
 
-    //# compute the control sequence
+    // compute the control sequence
     MatrixXd inputSequence;
     inputSequence = gainMatrix*trackingError;
 
@@ -182,27 +182,6 @@ void MPC::computeControlInputs()
     outputs.col(k)=C*states.col(k);
     k=k+1;
 }
-
-// void MPC::computeControlInputs()
-// {
-//     MatrixXd desiredControlTrajectory;
-//     desiredControlTrajectory = desiredInput(seq(k,k+f-1),all);  // f x r
-//
-//     // Reshape to column vector using Map
-//     Map<MatrixXd> desiredVector(desiredControlTrajectory.data(), f*r, 1);
-//
-//     MatrixXd trackingError;
-//     trackingError = desiredVector - O*states.col(k);
-//
-//     MatrixXd inputSequence;
-//     inputSequence = gainMatrix*trackingError;
-//
-//     inputs.col(k) = inputSequence(seq(0,m-1),all);
-//
-//     states.col(k+1) = A*states.col(k) + B*inputs.col(k);
-//     outputs.col(k) = C*states.col(k);
-//     k = k+1;
-// }
 
 void MPC::writeToCSV(const std::string& filename, const MatrixXd& matrix) const {
 	const static IOFormat CSVFormat(FullPrecision, DontAlignCols, ", ", "\n");
