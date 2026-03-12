@@ -1,82 +1,77 @@
 #include <iostream>
-#include<Eigen/Dense>
+#include <Eigen/Dense>
 #include "Controller.hpp"
+#include <cmath>
 
 using namespace Eigen;
 using Eigen::placeholders::all;
 
 int main()
 {
+    unsigned int f = 40;   // prediction horizon
+    unsigned int v = 35;   // control horizon
 
-	unsigned int f=20;// prediction horizon
-	unsigned int v=18;// control horizon
+    double sampling = 0.05;
 
-	double m1=2  ; double m2=2   ; double k1=100  ; double k2=200 ; double d1=1  ; double d2=5; 
+    MatrixXd C = MatrixXd::Identity(3, 3);
 
-    Matrix <double,4,4> Ac {{0, 1, 0, 0},
-                            {-(k1+k2)/m1 ,  -(d1+d2)/m1 , k2/m1 , d2/m1},
-                            {0 , 0 ,  0 , 1},
-                            {k2/m2,  d2/m2, -k2/m2, -d2/m2}};
-    Matrix <double,4,1> Bc {{0},{0},{0},{1/m2}};
-    Matrix <double,1,4> Cc {{1,0,0,0}};
+    VectorXd x0(3);
+    x0 << 0.0, 0.0, 0.0;
 
-    Matrix <double,4,1> x0 {{0},{0},{0},{0}}; 
+    // Actuator limits
+    VectorXd u_min(3), u_max(3);
+    u_min << -3.0, -3.0, -5.0;
+    u_max <<  3.0,  3.0,  5.0;
 
-	unsigned int n = Ac.rows();  unsigned int m = Bc.cols(); unsigned int r = Cc.rows();
+    // Weights
+    double Q0       = 0.0;
+    double Qother   = 0.1;  // control smoothness weight
+    double predWeight = 2000.0; // tracking weight
 
-	//# discretization constant
-	double sampling=0.05;
+    // Tuples
+    auto horizons = std::make_tuple(v, f);
+    auto weights  = std::make_tuple(Q0, Qother, predWeight);
 
-	// # model discretization
-	// identity matrix
-	MatrixXd In;
-	In= MatrixXd::Identity(n,n);
-	MatrixXd A;
-	MatrixXd B;
-	MatrixXd C;
-	A.resize(n,n);
-	B.resize(n,m);
-	C.resize(r,n);
-	A=(In-sampling*Ac).inverse();
-	B=A*sampling*Bc;
-	C=Cc;
+    // Reference trajectory: circle
+    double t_total   = 10.0;
+    double R_circle  = 2.0;
+    unsigned int timeSteps = static_cast<unsigned int>(t_total / sampling) + f + 10;
 
-	// Weights
-	double Q0=0.0000000011;
-	double Qother=0.0001;
-	double predWeight=10;
-	//Tuples
-	auto systemMatrices = std::make_tuple(A,B,C);
-	auto horizons = std::make_tuple(v,f);
-	auto weights = std::make_tuple(Q0, Qother, predWeight);
+    MatrixXd desiredTrajectory;
+    desiredTrajectory.resize(timeSteps, 3);
 
-	unsigned int timeSteps=300;
+    double omega_ref = 2.0 * M_PI / t_total;
 
-	//# pulse trajectory
+    for (int i = 0; i < timeSteps; i++)
+    {
+        double t = i * sampling;
+        double X_ref     =  R_circle * cos(omega_ref * t - M_PI/2.0);
+        double Y_ref     =  R_circle * sin(omega_ref * t - M_PI/2.0) + R_circle;
+        double theta_ref =  atan2( cos(omega_ref * t - M_PI/2.0),
+                                  -sin(omega_ref * t - M_PI/2.0));
+        desiredTrajectory(i, 0) = X_ref;
+        desiredTrajectory(i, 1) = Y_ref;
+        desiredTrajectory(i, 2) = theta_ref;
+    }
 
-	MatrixXd desiredTrajectory;
-	desiredTrajectory.resize(timeSteps,1);
-	desiredTrajectory.setZero();
+	for(int i = 0; i < 5; i++)
+    std::cout << "ref[" << i << "] = " 
+         << desiredTrajectory(i,0) << ", " 
+         << desiredTrajectory(i,1) << std::endl;
 
-	MatrixXd tmp1;
-	tmp1=MatrixXd::Ones(100,1);
+    // Construct MPC
+    MPC mpc(C, horizons, weights, x0, desiredTrajectory, sampling, u_min, u_max);
 
-	desiredTrajectory(seq(0,100-1),all)=tmp1;
-	desiredTrajectory(seq(200,timeSteps-1),all)=tmp1;
+    // Main control loop
+    for (int i = 0; i < timeSteps - f - 1; i++)
+    {
+        mpc.computeControlInputs();
+    }
 
-	MPC  mpc(systemMatrices, horizons,weights,x0,desiredTrajectory);
+    mpc.saveData("data/trajectory.csv",     "data/computedInputs.csv",
+                 "data/states.csv",         "data/outputs.csv",
+                 "data/Omatrix.csv",        "data/Mmatrix.csv");
 
-	// Main control loop
-	for (int index1=0; index1<timeSteps-f-1; index1++)
-	{
-	  mpc.computeControlInputs();    
-	}
-    
-	mpc.saveData("data/trajectory.csv", "data/computedInputs.csv", 
-								"data/states.csv", "data/outputs.csv","data/Omatrix.csv","data/Mmatrix.csv");
-
-	std::cout<<"Simulation completed!"<<std::endl;
-	return 0;
-
+    std::cout << "Simulation completed!" << std::endl;
+    return 0;
 }
-
