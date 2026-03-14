@@ -32,7 +32,7 @@ int main()
     auto horizons = std::make_tuple(v, f);
     auto weights  = std::make_tuple(Q0, Qother, predWeight);
 
-    // Reference trajectory: circle
+    // Reference trajectory
     double t_total   = 10.0;
     double R_circle  = 2.0;
     unsigned int timeSteps = static_cast<unsigned int>(t_total / sampling) + f + 10;
@@ -59,10 +59,8 @@ int main()
          << desiredTrajectory(i,0) << ", " 
          << desiredTrajectory(i,1) << std::endl;
 
-    // Construct MPC
     MPC mpc(C, horizons, weights, x0, desiredTrajectory, sampling, u_min, u_max);
 
-    // Main control loop
     for (int i = 0; i < timeSteps - f - 1; i++)
     {
         mpc.computeControlInputs();

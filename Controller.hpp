@@ -33,7 +33,6 @@ class MPC{
 		VectorXd u_prev;
 		VectorXd u_min, u_max; // actuator limits
 
-
 		VectorXd nonlinearDynamics(const VectorXd& x, const VectorXd& u) const;
 		std::tuple<MatrixXd, MatrixXd> linearizeModel(const VectorXd& x_bar,const VectorXd& u_bar) const;
 		void setObservabilityMatrix(const MatrixXd& A_k);

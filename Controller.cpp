@@ -56,7 +56,6 @@ void MPC::setObservabilityMatrix(const MatrixXd& A_k)
     O.setZero();
 
     MatrixXd _temp = MatrixXd::Identity(n, n);
-
     for (int i = 0; i < f; i++)
     {
         _temp = _temp * A_k;
@@ -68,7 +67,6 @@ void MPC::setToeplitzMatrix(const MatrixXd& A_k, const MatrixXd& B_k)
 {
     M.resize(f*r, v*m);
     M.setZero();
-
     MatrixXd _temp;
 
     for (int i = 0; i < f; i++)
@@ -171,9 +169,6 @@ std::tuple<MatrixXd,MatrixXd> MPC::linearizeModel(const VectorXd& x_bar, const V
 void MPC::computeControlInputs()
 {
     VectorXd x_k = states.col(k);
-    // DO NOT wrap x_k(2) here — let theta grow unbounded
-    // wrapping causes discontinuity in A_k*x_k vs f0
-
     auto [A_k, B_k] = linearizeModel(x_k, u_prev);
 
     setObservabilityMatrix(A_k);
@@ -196,8 +191,6 @@ void MPC::computeControlInputs()
     }
 
     VectorXd trackingError = refVec - O*x_k - offset;
-
-    // Wrap only the theta component of tracking error
     for (int i = 0; i < f; i++)
         trackingError(i*r + 2) = atan2(sin(trackingError(i*r + 2)),
                                         cos(trackingError(i*r + 2)));
@@ -210,9 +203,8 @@ void MPC::computeControlInputs()
         inputs.col(k)   = VectorXd::Zero(m);
         u_prev          = VectorXd::Zero(m);
         states.col(k+1) = nonlinearDynamics(x_k, VectorXd::Zero(m));
-        // Wrap only for output
         VectorXd state_out = states.col(k);
-        state_out(2) = atan2(sin(state_out(2)), cos(state_out(2)));
+        state_out(2) = atan2(sin(state_out(2)), cos(state_out(2))); //anle wrap
         outputs.col(k) = C * state_out;
         k++;
         return;
@@ -222,16 +214,12 @@ void MPC::computeControlInputs()
     u_apply = u_apply.cwiseMax(u_min).cwiseMin(u_max);
 
     inputs.col(k) = u_apply;
-    u_prev        = u_apply;
+    u_prev = u_apply;
 
-    // Propagate — NO angle wrap on state, let theta grow continuously
     states.col(k+1) = nonlinearDynamics(x_k, u_apply);
-
-    // Wrap only for output/plotting
     VectorXd state_out = states.col(k);
     state_out(2) = atan2(sin(state_out(2)), cos(state_out(2)));
     outputs.col(k) = C * state_out;
-
     k++;
 }
 
